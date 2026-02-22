@@ -1,5 +1,4 @@
 services:
-  # MongoDB Database
   mongo:
     image: mongo:6.0
     container_name: ecommerce_mongo
@@ -13,8 +12,12 @@ services:
       - mongo_data:/data/db
     networks:
       - ecommerce_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: ecommerce_redis
@@ -25,8 +28,12 @@ services:
       - redis_data:/data
     networks:
       - ecommerce_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # RabbitMQ Message Queue
   rabbitmq:
     image: rabbitmq:3-management
     container_name: ecommerce_rabbitmq
@@ -36,29 +43,35 @@ services:
       RABBITMQ_DEFAULT_PASS: password
     ports:
       - "5672:5672"
-      - "15672:15672"  # Management UI
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - ecommerce_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Backend API
   backend:
     build: ./backend
     container_name: ecommerce_backend
     restart: always
     env_file:
-    - ./backend/.env 
+      - ./backend/.env
     ports:
       - "5000:5000"
     depends_on:
-      - mongo
-      - redis
-      - rabbitmq
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ecommerce_network
 
-  # Frontend React App
   frontend:
     build: ./frontend
     container_name: ecommerce_frontend
